@@ -8,34 +8,15 @@ import json
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 
 CIBLES_URG = [
-    "M. Belhomme De Franqueville",
-    "L. Okoyi Ossouka Mapangou",
-    "E. Beros",
-    "P. Messina",
-    "J. Peyres",
-    "S. Niane",
-    "C. Vasseur",
-    "J. Blanc",
-    "A. Khadraoui",
-    "M. Harhour",
-    "E. Perthuisot",
-    "R. Pebay",
-    "I. Mokhtari",
-    "A. Ponton",
-    "E. Macabiau",
-    "J. Langlois",
-    "A. Wilhelm",
-    "C. Viola",
+    "M. Belhomme De Franqueville", "L. Okoyi Ossouka Mapangou", "E. Beros",
+    "P. Messina", "J. Peyres", "S. Niane", "C. Vasseur", "J. Blanc",
+    "A. Khadraoui", "M. Harhour", "E. Perthuisot", "R. Pebay", "I. Mokhtari",
+    "A. Ponton", "E. Macabiau", "J. Langlois", "A. Wilhelm", "C. Viola",
 ]
 
 CIBLES_GERIA = [
-    "P. Lorette",
-    "Y. Esteves",
-    "E. Salgues",
-    "S. Kassou",
-    "T. Bourot",
-    "M. Gratesac",
-    "C. Gorra",
+    "P. Lorette", "Y. Esteves", "E. Salgues", "S. Kassou",
+    "T. Bourot", "M. Gratesac", "C. Gorra",
 ]
 
 CIBLES = CIBLES_URG + CIBLES_GERIA
@@ -49,7 +30,6 @@ PLANNINGS = {
     "geriatrie":       "https://app.planning.lifen.health/external/plannings/55ed4e1c59041a69a363",
 }
 
-# URL planning-medical pour les seniors
 PM_URL = "https://www.planning-medical.com/p.php?s=532babfe6f45ec233bac467f086a3f8a&b={offset}"
 
 MOIS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin",
@@ -73,27 +53,20 @@ POSTES_GERIA = {
 }
 
 JOURS_FERIES = {
-    date(2026, 5,  8),
-    date(2026, 5, 14),
-    date(2026, 5, 25),
-    date(2026, 7, 14),
-    date(2026, 8, 15),
-    date(2026, 11, 1),
+    date(2026, 5,  8), date(2026, 5, 14), date(2026, 5, 25),
+    date(2026, 7, 14), date(2026, 8, 15), date(2026, 11, 1),
 }
 
 DEBUG = True
 
 # ─── CORRESPONDANCES INTERNE → SENIOR(S) ──────────────────────────────────────
-# Clé : fragment du poste interne (lowercase)
-# Valeur : liste de clés dans le dict seniors du jour
-# Les clés seniors correspondent aux noms de colonnes dans planning-medical
 
 def seniors_pour_poste(poste):
-    """Retourne la liste des clés seniors pour un poste interne donné."""
     p = poste.lower()
-    nuit = 'nuit' in p or '13h-8' in p or '13 - 8' in p or '18h-8' in p or '13h - 8' in p
+    nuit = ('nuit' in p or 'soir' in p or
+            re.search(r'13\s*h?\s*[-–]\s*8', p) or
+            re.search(r'18\s*h?\s*[-–]\s*8', p))
 
-    # Rangueil
     if 'amct 1' in p:
         return ['MAO NUIT'] if nuit else ['MAO']
     if 'amct 2' in p:
@@ -102,10 +75,8 @@ def seniors_pour_poste(poste):
         return ['MAO NUIT', 'SAUV R NUIT'] if nuit else ['MAO', 'SAUV R']
     if 'uhcd r' in p or ('uhcd' in p and 'purpan' not in p):
         return [] if nuit else ['UHCD R', 'MAO', 'SAUV R']
-    if 'sauv r' in p or ('sauv' in p and 'purpan' not in p and 'rangueil' not in p and 'nuit' not in p):
+    if 'sauv r' in p:
         return ['SAUV R NUIT'] if nuit else ['SAUV R']
-
-    # Purpan
     if 'hub 1' in p:
         return ['AMT HUB 1 Nuit'] if nuit else ['AMT HUB 1 Purpan']
     if 'hub 2' in p:
@@ -113,16 +84,13 @@ def seniors_pour_poste(poste):
     if 'hub 3' in p:
         return ['AMT HUB 3 Nuit'] if nuit else ['AMT HUB 3 Purpan']
     if 'sauv' in p and ('purpan' in p or 'tfc' in p):
-        return ['SAUV/MCO/TFC Nuit'] if nuit else ['SAUV/TFC Purpan']
+        return ['SAUV / MCO / TFC Nuit'] if nuit else ['SAUV / TFC Purpan']
     if 'ua' in p and ('jour' in p or 'rééval' in p):
         return ['AMT Med Rev Purpan']
     if 'ua' in p and 'nuit' in p:
         return ['AMT Med Rev Soir Purpan']
-
-    # LDS → personne
     if 'lds' in p:
         return []
-
     return []
 
 # ─── HELPERS DATE ─────────────────────────────────────────────────────────────
@@ -187,14 +155,14 @@ def fetch_planning(nom, url):
                 f.write(texte)
         return texte
     except Exception as e:
-        print(f"  ⚠ Erreur fetch {url}: {e}")
+        print(f"  Erreur fetch {url}: {e}")
         return ""
 
 # ─── FETCH SENIORS (planning-medical) ─────────────────────────────────────────
 
 def fetch_seniors():
     """
-    Scrape planning-medical.com.
+    Scrape planning-medical.com sur toute la periode ete.
     Format cellule : "POSTE|Nom Initiale." (sep=|, xa0=espace insecable)
     Date dans la derniere cellule : "Jeu|28/05/2026"
     """
@@ -205,18 +173,21 @@ def fetch_seniors():
     for offset in range(0, 190, 10):
         url = PM_URL.format(offset=offset)
         try:
-            r = requests.get(url, timeout=15, headers=headers)
+            r = requests.get(url, timeout=20, headers=headers)
             r.raise_for_status()
         except Exception as e:
-            print(f"    offset {offset}: {e}")
+            print(f"    offset {offset}: erreur {e}")
             continue
 
         soup = BeautifulSoup(r.text, "html.parser")
         table = soup.find("table")
         if not table:
+            print(f"    offset {offset}: pas de tableau")
             continue
 
         rows = table.find_all("tr")
+        nb_avant = len(seniors)
+
         for row in rows:
             cells = row.find_all("td")
             if len(cells) < 2:
@@ -246,269 +217,16 @@ def fetch_seniors():
                 if len(parts) >= 2:
                     poste_senior = parts[0].strip()
                     nom_senior = parts[-1].strip()
-                    if poste_senior and nom_senior:
+                    if poste_senior and nom_senior and len(poste_senior) < 50:
                         seniors[date_iso][poste_senior] = nom_senior
 
-    nb_jours = len(seniors)
-    print(f"    {nb_jours} jours de seniors charges")
-    if nb_jours > 0:
-        first_date = sorted(seniors.keys())[0]
-        print(f"    Exemple {first_date}: {list(seniors[first_date].items())[:3]}")
-    return seniors
+        nb_apres = len(seniors)
+        print(f"    offset {offset}: {nb_apres - nb_avant} nouveaux jours (total {nb_apres})")
 
-# -*- coding: utf-8 -*-
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime, date, timedelta
-import re
-import json
-
-# ─── CONFIG ───────────────────────────────────────────────────────────────────
-
-CIBLES_URG = [
-    "M. Belhomme De Franqueville",
-    "L. Okoyi Ossouka Mapangou",
-    "E. Beros",
-    "P. Messina",
-    "J. Peyres",
-    "S. Niane",
-    "C. Vasseur",
-    "J. Blanc",
-    "A. Khadraoui",
-    "M. Harhour",
-    "E. Perthuisot",
-    "R. Pebay",
-    "I. Mokhtari",
-    "A. Ponton",
-    "E. Macabiau",
-    "J. Langlois",
-    "A. Wilhelm",
-    "C. Viola",
-]
-
-CIBLES_GERIA = [
-    "P. Lorette",
-    "Y. Esteves",
-    "E. Salgues",
-    "S. Kassou",
-    "T. Bourot",
-    "M. Gratesac",
-    "C. Gorra",
-]
-
-CIBLES = CIBLES_URG + CIBLES_GERIA
-
-PLANNINGS = {
-    "gardes_purpan":   "https://app.planning.lifen.health/external/plannings/513b393c3c6a11e88b24",
-    "gardes_rangueil": "https://app.planning.lifen.health/external/plannings/647003302b22a53d19c1",
-    "urgences":        "https://app.planning.lifen.health/external/plannings/d9620e86592712e23672",
-    "urgences_jf":     "https://app.planning.lifen.health/external/plannings/78ef22ade246745d3835",
-    "sauv":            "https://app.planning.lifen.health/external/plannings/bfe39d8a0bc17b5e8906",
-    "geriatrie":       "https://app.planning.lifen.health/external/plannings/55ed4e1c59041a69a363",
-}
-
-# URL planning-medical pour les seniors
-PM_URL = "https://www.planning-medical.com/p.php?s=532babfe6f45ec233bac467f086a3f8a&b={offset}"
-
-MOIS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin",
-           "Juillet","Août","Septembre","Octobre","Novembre","Décembre"]
-MOIS_NUM = {m: i+1 for i, m in enumerate(MOIS_FR)}
-
-NON_ATTRIBUE = {"non attribué", "r. planning urg toulouse"}
-JOURS_SEMAINE = {"lun","mar","mer","jeu","ven","sam","dim"}
-
-PARASITES = {
-    "lifen planning", "créez votre compte", "voir les échanges",
-    "télécharger", "du", "au", "actions", "ajouter vos indisponibilités",
-    "plannings", "actifs", "terminés", "publié et disponible",
-    "© 2014", "centre d'aide", "contacter le support", "suggérer une évolution",
-    "fr", "en", "tableau de bord", "agenda", "échanges", "disponibilités",
-}
-
-POSTES_GERIA = {
-    "garonne-soins palliatifs", "garonne-soins palliatifs-pum",
-    "pug-albarède", "pug albarède", "pug rangueil", "pug-rangueil jf",
-}
-
-JOURS_FERIES = {
-    date(2026, 5,  8),
-    date(2026, 5, 14),
-    date(2026, 5, 25),
-    date(2026, 7, 14),
-    date(2026, 8, 15),
-    date(2026, 11, 1),
-}
-
-DEBUG = True
-
-# ─── CORRESPONDANCES INTERNE → SENIOR(S) ──────────────────────────────────────
-# Clé : fragment du poste interne (lowercase)
-# Valeur : liste de clés dans le dict seniors du jour
-# Les clés seniors correspondent aux noms de colonnes dans planning-medical
-
-def seniors_pour_poste(poste):
-    """Retourne la liste des clés seniors pour un poste interne donné."""
-    p = poste.lower()
-    nuit = 'nuit' in p or '13h-8' in p or '13 - 8' in p or '18h-8' in p or '13h - 8' in p
-
-    # Rangueil
-    if 'amct 1' in p:
-        return ['MAO NUIT'] if nuit else ['MAO']
-    if 'amct 2' in p:
-        return ['AMCT NUIT'] if nuit else ['AMCT']
-    if 'cmct' in p:
-        return ['MAO NUIT', 'SAUV R NUIT'] if nuit else ['MAO', 'SAUV R']
-    if 'uhcd r' in p or ('uhcd' in p and 'purpan' not in p):
-        return [] if nuit else ['UHCD R', 'MAO', 'SAUV R']
-    if 'sauv r' in p or ('sauv' in p and 'purpan' not in p and 'rangueil' not in p and 'nuit' not in p):
-        return ['SAUV R NUIT'] if nuit else ['SAUV R']
-
-    # Purpan
-    if 'hub 1' in p:
-        return ['AMT HUB 1 Nuit'] if nuit else ['AMT HUB 1 Purpan']
-    if 'hub 2' in p:
-        return ['AMT HUB 2 Nuit'] if nuit else ['AMT HUB 2 Purpan']
-    if 'hub 3' in p:
-        return ['AMT HUB 3 Nuit'] if nuit else ['AMT HUB 3 Purpan']
-    if 'sauv' in p and ('purpan' in p or 'tfc' in p):
-        return ['SAUV/MCO/TFC Nuit'] if nuit else ['SAUV/TFC Purpan']
-    if 'ua' in p and ('jour' in p or 'rééval' in p):
-        return ['AMT Med Rev Purpan']
-    if 'ua' in p and 'nuit' in p:
-        return ['AMT Med Rev Soir Purpan']
-
-    # LDS → personne
-    if 'lds' in p:
-        return []
-
-    return []
-
-# ─── HELPERS DATE ─────────────────────────────────────────────────────────────
-
-def est_ferie(d):            return d in JOURS_FERIES
-def est_samedi(d):           return d.weekday() == 5
-def est_dimanche_ou_ferie(d): return d.weekday() == 6 or est_ferie(d)
-
-# ─── CATÉGORISATION ───────────────────────────────────────────────────────────
-
-def categoriser_urg(poste):
-    p = poste.lower()
-    if re.search(r'\blds\b', p):
-        return ('violet', 'lds')
-    if 'nuit' in p:
-        return ('jaune', 'garde')
-    if re.search(r'13\s*h?\s*[-–]\s*8\s*h?', p) or '13-8' in p or '13 - 8' in p:
-        return ('jaune', 'garde')
-    if re.search(r'18\s*h?\s*[-–]\s*8\s*h?', p) or '18-8' in p or '18h-8h' in p:
-        return ('jaune', 'garde')
-    if re.search(r'8\s*h?\s*[-–]\s*13\s*h?', p) or '8-13' in p:
-        return ('jaune', 'demi-garde')
-    if re.search(r'13\s*h?\s*[-–]\s*18\s*h?', p) or '13-18' in p or '13h-18' in p:
-        return ('jaune', 'demi-garde')
-    return ('rouge', 'jour')
-
-def categoriser_geria(poste, jour_date):
-    p = poste.lower()
-    if 'jf' in p:
-        return ('rouge', 'geria-jf')
-    if est_dimanche_ou_ferie(jour_date):
-        return ('rouge', 'geria-dim')
-    elif est_samedi(jour_date):
-        return ('jaune', 'geria-sam')
-    else:
-        return ('orange', 'geria-semaine')
-
-def repos_apres_garde_urg(poste, type_poste):
-    if type_poste == 'demi-garde':
-        return False
-    p = poste.lower()
-    if 'nuit' in p: return True
-    if re.search(r'13\s*h?\s*[-–]\s*8\s*h?', p) or '13-8' in p or '13 - 8' in p: return True
-    if re.search(r'18\s*h?\s*[-–]\s*8\s*h?', p) or '18-8' in p or '18h-8h' in p: return True
-    if re.search(r'\blds\b', p): return True
-    return False
-
-def est_poste_geria(poste):
-    return poste.lower().strip() in POSTES_GERIA
-
-# ─── FETCH LIFEN ──────────────────────────────────────────────────────────────
-
-def fetch_planning(nom, url):
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-        r = requests.get(url, timeout=15, headers=headers)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, 'html.parser')
-        texte = soup.get_text('\n')
-        if DEBUG:
-            with open(f"debug_{nom}.txt", "w", encoding="utf-8") as f:
-                f.write(texte)
-        return texte
-    except Exception as e:
-        print(f"  ⚠ Erreur fetch {url}: {e}")
-        return ""
-
-# ─── FETCH SENIORS (planning-medical) ─────────────────────────────────────────
-
-def fetch_seniors():
-    """
-    Scrape planning-medical.com sur toute la période été.
-    Retourne un dict : seniors[date_iso][poste_senior] = "Nom Prenom"
-    """
-    print("  → Scraping planning-medical pour les seniors...")
-    seniors = {}
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-
-    # Couvrir mai → novembre 2026 (~185 jours, par pages de 10)
-    for offset in range(0, 190, 10):
-        url = PM_URL.format(offset=offset)
-        try:
-            r = requests.get(url, timeout=15, headers=headers)
-            r.raise_for_status()
-        except Exception as e:
-            print(f"    ⚠ offset {offset}: {e}")
-            continue
-
-        soup = BeautifulSoup(r.text, 'html.parser')
-        table = soup.find('table')
-        if not table:
-            continue
-
-        rows = table.find_all('tr')
-        for row in rows:
-            cells = row.find_all('td')
-            if not cells:
-                continue
-
-            # Date dans la derniere cellule : "Jeu|28/05/2026"
-            last_txt = cells[-1].get_text(separator="|", strip=True)
-            m = re.search(r'(\d{2}/\d{2}/\d{4})', last_txt)
-            if not m:
-                continue
-            try:
-                jour_date = datetime.strptime(m.group(1), "%d/%m/%Y").date()
-            except:
-                continue
-
-            date_iso = jour_date.isoformat()
-            if date_iso not in seniors:
-                seniors[date_iso] = {}
-
-            # Format cellule : "POSTE|Nom\xa0Initiale."
-            for cell in cells:
-                txt = cell.get_text(separator="|", strip=True)
-                if not txt or "pourvoir" in txt.lower():
-                    continue
-                parts = txt.split("|")
-                parts = [p.replace("\xa0", " ").strip() for p in parts if p.strip()]
-                if len(parts) >= 2:
-                    poste_senior = parts[0].strip()
-                    nom_senior = parts[-1].strip()
-                    if poste_senior and nom_senior:
-                        seniors[date_iso][poste_senior] = nom_senior
-
-    nb_jours = len(seniors)
-    print(f"    ✓ {nb_jours} jours de seniors chargés")
+    print(f"  -> Total: {len(seniors)} jours de seniors charges")
+    if seniors:
+        first = sorted(seniors.keys())[0]
+        print(f"     Exemple {first}: {list(seniors[first].items())[:4]}")
     return seniors
 
 # ─── PARSER LIFEN ─────────────────────────────────────────────────────────────
@@ -571,7 +289,6 @@ def parse_texte(texte):
         if est_poste_valide(ligne):
             poste_courant = ligne
             continue
-
     return resultats
 
 # ─── CONSTRUCTION DU PLANNING ─────────────────────────────────────────────────
@@ -585,6 +302,8 @@ def construire_planning(toutes_entrees, seniors):
                 nom: {"couleur": "vert", "postes": [], "repos": False, "seniors": []}
                 for nom in CIBLES
             }
+
+    nb_seniors_trouves = 0
 
     for e in toutes_entrees:
         nom = e["personne"]
@@ -618,17 +337,18 @@ def construire_planning(toutes_entrees, seniors):
                 cell["postes"].append(poste)
                 cell["couleur"] = "orange"
 
-        # Récupérer les seniors pour ce poste ce jour
+        # Seniors
         date_iso = jour_date.isoformat()
         jour_seniors = seniors.get(date_iso, {})
-        cles_seniors = seniors_pour_poste(poste)
-        for cle in cles_seniors:
-            # Cherche la clé dans les seniors du jour (correspondance souple)
+        cles = seniors_pour_poste(poste)
+        for cle in cles:
+            # Correspondance souple
             for k, v in jour_seniors.items():
-                if cle.lower() in k.lower() or k.lower() in cle.lower():
+                if cle.lower().strip() == k.lower().strip():
                     label = f"{cle}: {v}"
                     if label not in cell["seniors"]:
                         cell["seniors"].append(label)
+                        nb_seniors_trouves += 1
                     break
 
         if genere_repos:
@@ -644,6 +364,7 @@ def construire_planning(toutes_entrees, seniors):
                     cell_r["postes"].append(label_r)
                     cell_r["repos"] = True
 
+    print(f"  -> {nb_seniors_trouves} associations interne-senior trouvees")
     return planning
 
 # ─── GÉNÉRATION HTML ──────────────────────────────────────────────────────────
@@ -716,8 +437,7 @@ def generer_html(planning, date_maj):
         nb_j = nb_jours_mois(mois)
         a_donnees = any(
             planning[mois][d][n]["postes"]
-            for d in range(1, nb_j+1)
-            for n in CIBLES
+            for d in range(1, nb_j+1) for n in CIBLES
         )
         jours_html = "".join('<div class="day-cell empty"></div>' for _ in range(decalage))
 
@@ -739,10 +459,10 @@ def generer_html(planning, date_maj):
                 groupe = "urg" if nom in urg_set else "geria"
                 nom_attr = nom.replace('"', '&quot;')
 
-                # Seniors en italique sous le nom
-                seniors_html = ""
-                for s in cell["seniors"]:
-                    seniors_html += f'<span class="slot-senior">{s}</span>'
+                seniors_html = "".join(
+                    f'<span class="slot-senior">{s}</span>'
+                    for s in cell["seniors"]
+                )
 
                 slots += (
                     f'<div class="slot {groupe}" data-nom="{nom_attr}" '
@@ -755,8 +475,8 @@ def generer_html(planning, date_maj):
             we_class    = " weekend" if is_we else ""
             ferie_class = " ferie"   if is_ferie else ""
             today_class = " today"   if is_today else ""
-            today_badge = '<span class="today-badge">Aujourd\'hui</span>' if is_today else ""
-            ferie_badge = '<span class="ferie-badge">JF</span>' if is_ferie else ""
+            today_badge = "<span class='today-badge'>Aujourd'hui</span>" if is_today else ""
+            ferie_badge = "<span class='ferie-badge'>JF</span>" if is_ferie else ""
 
             jours_html += (
                 f'<div class="day-cell{we_class}{ferie_class}{today_class}">'
@@ -972,33 +692,31 @@ setFilter(currentFilter);
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 def main():
-    print("🏥 Génération du planning...")
+    print("Generation du planning...")
 
-    # Scraping seniors
     seniors = fetch_seniors()
 
-    # Scraping Lifen
     toutes_entrees = []
     for nom, url in PLANNINGS.items():
-        print(f"  → Fetch {nom}...")
+        print(f"  -> Fetch {nom}...")
         texte = fetch_planning(nom, url)
         entrees = parse_texte(texte)
         cibles = [e for e in entrees if e["personne"] in CIBLES]
-        print(f"     {len(entrees)} entrées, dont {len(cibles)} pour les cibles")
+        print(f"     {len(entrees)} entrees, dont {len(cibles)} pour les cibles")
         toutes_entrees.extend(entrees)
 
-    print(f"\n  Total : {len(toutes_entrees)} entrées")
+    print(f"\n  Total : {len(toutes_entrees)} entrees")
     for nom in CIBLES:
         n = sum(1 for e in toutes_entrees if e["personne"] == nom)
         if n > 0:
-            print(f"    {nom}: {n} entrées")
+            print(f"    {nom}: {n}")
 
     planning = construire_planning(toutes_entrees, seniors)
-    date_maj = datetime.now().strftime("%d/%m/%Y à %H:%M")
+    date_maj = datetime.now().strftime("%d/%m/%Y a %H:%M")
     html = generer_html(planning, date_maj)
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html)
-    print(f"\n✅ index.html généré ({len(html)//1024} Ko)")
+    print(f"\nindex.html genere ({len(html)//1024} Ko)")
 
 if __name__ == "__main__":
     main()
